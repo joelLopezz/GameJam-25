@@ -169,7 +169,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: idle
+  m_Name: Pistol Idle
   m_Speed: 1
   m_CycleOffset: 0
   m_Transitions:
@@ -204,7 +204,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Running Backward
+  m_Name: Pistol Run Backward
   m_Speed: 1
   m_CycleOffset: 0
   m_Transitions:
@@ -392,7 +392,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Walking Backward
+  m_Name: Pistol Walk Backward
   m_Speed: 1
   m_CycleOffset: 0
   m_Transitions:
@@ -840,7 +840,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Standard Walk
+  m_Name: Pistol Walk
   m_Speed: 1
   m_CycleOffset: 0
   m_Transitions:
@@ -869,7 +869,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Slow Run
+  m_Name: Pistol Run
   m_Speed: 1
   m_CycleOffset: 0
   m_Transitions:
@@ -898,7 +898,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Right Strafe
+  m_Name: Pistol Strafe Right
   m_Speed: 1
   m_CycleOffset: 0
   m_Transitions:
@@ -1004,7 +1004,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Left Strafe
+  m_Name: Pistol Strafe Left
   m_Speed: 1
   m_CycleOffset: 0
   m_Transitions:

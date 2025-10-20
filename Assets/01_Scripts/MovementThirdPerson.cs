@@ -25,6 +25,7 @@ public class MovementThirdPerson : MonoBehaviour
     public float bulletSpeed = 20f;
     public ParticleSystem muzzleFlash;
     public AudioClip shootSound;
+    public LayerMask layersAIgnorar;
 
     [Header("Cámara")]
     public Transform camara;
@@ -39,6 +40,9 @@ public class MovementThirdPerson : MonoBehaviour
     private float anguloHorizontalCamara = 0f;
     private float anguloVerticalCamara = 10f;
     private bool estaEnSuelo;
+
+    [Header("UI")]
+    public Crosshair crosshair;
 
     void Start()
     {
@@ -109,28 +113,50 @@ public class MovementThirdPerson : MonoBehaviour
 
     void Disparar()
     {
-        // Crear la bala
+        // Raycast desde el centro de la cámara, IGNORANDO el layer del jugador
+        Ray ray = camara.GetComponent<Camera>().ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
+        RaycastHit hit;
+        Vector3 targetPoint;
+
+        // ✨ IMPORTANTE: ~layersAIgnorar invierte la máscara (detecta todo EXCEPTO esos layers)
+        if (Physics.Raycast(ray, out hit, 1000f, ~layersAIgnorar))
+        {
+            targetPoint = hit.point;
+            Debug.DrawLine(camara.position, hit.point, UnityEngine.Color.red, 0.5f);
+        }
+        else
+        {
+            targetPoint = ray.origin + ray.direction * 1000f;
+        }
+
+        Vector3 direccionDisparo = (targetPoint - firePoint.position).normalized;
+
+        // Crear bala
         if (bulletPrefab != null && firePoint != null)
         {
-            GameObject bullet = Instantiate(bulletPrefab, firePoint.position, firePoint.rotation);
+            GameObject bullet = Instantiate(bulletPrefab, firePoint.position, Quaternion.LookRotation(direccionDisparo));
 
             Rigidbody bulletRb = bullet.GetComponent<Rigidbody>();
             if (bulletRb != null)
             {
-                bulletRb.velocity = firePoint.forward * bulletSpeed;
+                bulletRb.velocity = direccionDisparo * bulletSpeed;
             }
 
             Destroy(bullet, 3f);
         }
 
-        // Sonido de disparo
+        // Efectos
         if (audioSource != null && shootSound != null)
         {
             audioSource.PlayOneShot(shootSound);
         }
 
-        // Animación de disparo
         animator.SetTrigger("Shoot");
+
+        if (crosshair != null)
+        {
+            crosshair.OnShoot();
+        }
     }
 
     void Mover()
