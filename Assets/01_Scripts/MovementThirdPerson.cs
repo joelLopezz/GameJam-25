@@ -4,6 +4,7 @@ using System.Drawing;
 using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using static UnityEngine.EventSystems.EventTrigger;
 
 public class MovementThirdPerson : MonoBehaviour
@@ -44,6 +45,8 @@ public class MovementThirdPerson : MonoBehaviour
     [Header("UI")]
     public Crosshair crosshair;
 
+    private PauseManager pauseManager;
+
     void Start()
     {
         animator = GetComponent<Animator>();
@@ -66,26 +69,50 @@ public class MovementThirdPerson : MonoBehaviour
             gc.transform.localPosition = new Vector3(0, 0, 0);
             groundCheck = gc.transform;
         }
+
+        pauseManager = FindObjectOfType<PauseManager>();
     }
 
     void Update()
     {
+        // Si está pausado, no procesar nada
+        if (pauseManager != null && pauseManager.IsPaused()) return;
+
         CheckGround();
         RotarCamara();
         RotarPersonaje();
         ActualizarAnimacion();
 
-        // ✨ SALTO
         if (Input.GetKeyDown(KeyCode.Space) && estaEnSuelo)
         {
             Saltar();
         }
 
-        // ✨ DISPARO
-        if (Input.GetButtonDown("Fire1")) // Cambié GetButton por GetButtonDown para un disparo por click
+        // ✨ VERIFICAR QUE NO ESTAMOS CLICKEANDO EN UI
+        if (Input.GetButtonDown("Fire1") && !IsPointerOverUI())
         {
             Disparar();
         }
+    }
+
+    bool IsPointerOverUI()
+    {
+        // Si estamos en móvil, usar touch
+        if (EventSystem.current.IsPointerOverGameObject())
+        {
+            return true;
+        }
+
+        // En PC/Mac, verificar todos los toques
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            if (EventSystem.current.IsPointerOverGameObject(Input.GetTouch(i).fingerId))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     void FixedUpdate()
