@@ -1,11 +1,6 @@
 ﻿using System.Collections;
-using System.Collections.Generic;
-using System.Drawing;
-using Unity.VisualScripting;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using static UnityEngine.EventSystems.EventTrigger;
 
 public class MovementThirdPerson : MonoBehaviour
 {
@@ -17,8 +12,10 @@ public class MovementThirdPerson : MonoBehaviour
     [Header("Salto")]
     public float fuerzaSalto = 5f;
     public LayerMask capaSuelo;
-    public Transform groundCheck; // Punto para detectar suelo
-    public float distanciaGroundCheck = 0.2f;
+    public float distanciaRaycastSuelo = 0.6f;
+    public float offsetRaycast = 0.1f;
+    public float saltoCooldown = 0.3f;
+    private bool esperandoPermiso = false;
 
     [Header("Disparo")]
     public Transform firePoint;
@@ -35,23 +32,25 @@ public class MovementThirdPerson : MonoBehaviour
     public float sensibilidadCamara = 2f;
     public float suavizadoCamara = 5f;
 
-    private Animator animator;
-    private Rigidbody rb;
-    private AudioSource audioSource;
-    private float anguloHorizontalCamara = 0f;
-    private float anguloVerticalCamara = 10f;
-    private bool estaEnSuelo;
-
     [Header("UI")]
     public Crosshair crosshair;
 
+    private Animator animator;
+    private Rigidbody rb;
+    private AudioSource audioSource;
     private PauseManager pauseManager;
+    private float anguloHorizontalCamara = 0f;
+    private float anguloVerticalCamara = 10f;
+    private bool estaEnSuelo;
+    private bool puedeVolverASaltar = true;
+    private float ultimoSaltoTime = -10f;
 
     void Start()
     {
         animator = GetComponent<Animator>();
         rb = GetComponent<Rigidbody>();
         audioSource = GetComponent<AudioSource>();
+        pauseManager = FindObjectOfType<PauseManager>();
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -60,50 +59,138 @@ public class MovementThirdPerson : MonoBehaviour
         {
             camara = Camera.main.transform;
         }
-
-        // Crear groundCheck si no existe
-        if (groundCheck == null)
-        {
-            GameObject gc = new GameObject("GroundCheck");
-            gc.transform.parent = transform;
-            gc.transform.localPosition = new Vector3(0, 0, 0);
-            groundCheck = gc.transform;
-        }
-
-        pauseManager = FindObjectOfType<PauseManager>();
     }
 
     void Update()
     {
-        // Si está pausado, no procesar nada
-        if (pauseManager != null && pauseManager.IsPaused()) return;
+        if (pauseManager != null && pauseManager.IsPaused())
+        {
+            return;
+        }
 
         CheckGround();
         RotarCamara();
         RotarPersonaje();
         ActualizarAnimacion();
 
-        if (Input.GetKeyDown(KeyCode.Space) && estaEnSuelo)
+        if (Input.GetKeyDown(KeyCode.Space))
         {
-            Saltar();
+            IntentarSaltar();
         }
 
-        // ✨ VERIFICAR QUE NO ESTAMOS CLICKEANDO EN UI
         if (Input.GetButtonDown("Fire1") && !IsPointerOverUI())
         {
             Disparar();
         }
     }
 
+    void FixedUpdate()
+    {
+        if (pauseManager != null && pauseManager.IsPaused())
+        {
+            return;
+        }
+
+        Mover();
+    }
+
+    void CheckGround()
+    {
+        Vector3 rayOrigin = transform.position + Vector3.up * offsetRaycast;
+        RaycastHit hit;
+        bool estabaEnSuelo = estaEnSuelo;
+
+        bool raycastDetectoSuelo = Physics.Raycast(rayOrigin, Vector3.down, out hit, distanciaRaycastSuelo, capaSuelo);
+
+        if (raycastDetectoSuelo)
+        {
+            float distanciaAlSuelo = hit.distance;
+            bool velocidadCasiCero = rb.velocity.y > -0.8f && rb.velocity.y < 0.3f;
+            bool muyMuyCerca = distanciaAlSuelo < 0.12f;
+
+            estaEnSuelo = muyMuyCerca && velocidadCasiCero;
+        }
+        else
+        {
+            estaEnSuelo = false;
+        }
+
+        if (estaEnSuelo && !estabaEnSuelo && Mathf.Abs(rb.velocity.y) < 0.3f && !esperandoPermiso)
+        {
+            esperandoPermiso = true;
+            StartCoroutine(PermitirSaltarDespuesDeAterrizar());
+        }
+
+        if (!estaEnSuelo && estabaEnSuelo)
+        {
+            puedeVolverASaltar = false;
+            esperandoPermiso = false;
+        }
+
+        animator.SetBool("IsGrounded", estaEnSuelo);
+    }
+
+    IEnumerator PermitirSaltarDespuesDeAterrizar()
+    {
+        yield return new WaitForSeconds(0.2f);
+
+        if (estaEnSuelo && Mathf.Abs(rb.velocity.y) < 0.3f && transform.position.y < 0.15f)
+        {
+            puedeVolverASaltar = true;
+        }
+
+        esperandoPermiso = false;
+    }
+
+    void IntentarSaltar()
+    {
+        bool cooldownCompleto = Time.time > ultimoSaltoTime + saltoCooldown;
+        bool velocidadVerticalBaja = Mathf.Abs(rb.velocity.y) < 0.5f;
+
+        bool puedesSaltar = estaEnSuelo &&
+                            puedeVolverASaltar &&
+                            cooldownCompleto &&
+                            velocidadVerticalBaja;
+
+        if (puedesSaltar)
+        {
+            Saltar();
+        }
+    }
+
+    void Saltar()
+    {
+        if (Time.time < ultimoSaltoTime + 0.15f)
+        {
+            return;
+        }
+
+        rb.velocity = new Vector3(rb.velocity.x, fuerzaSalto, rb.velocity.z);
+        animator.SetBool("IsJumping", true);
+
+        puedeVolverASaltar = false;
+        esperandoPermiso = false;
+        estaEnSuelo = false;
+        animator.SetBool("IsGrounded", false);
+
+        ultimoSaltoTime = Time.time;
+
+        StartCoroutine(DesactivarIsJumping());
+    }
+
+    IEnumerator DesactivarIsJumping()
+    {
+        yield return new WaitForEndOfFrame();
+        animator.SetBool("IsJumping", false);
+    }
+
     bool IsPointerOverUI()
     {
-        // Si estamos en móvil, usar touch
         if (EventSystem.current.IsPointerOverGameObject())
         {
             return true;
         }
 
-        // En PC/Mac, verificar todos los toques
         for (int i = 0; i < Input.touchCount; i++)
         {
             if (EventSystem.current.IsPointerOverGameObject(Input.GetTouch(i).fingerId))
@@ -115,41 +202,15 @@ public class MovementThirdPerson : MonoBehaviour
         return false;
     }
 
-    void FixedUpdate()
-    {
-        Mover();
-    }
-
-    void CheckGround()
-    {
-        // Detectar si está en el suelo
-        estaEnSuelo = Physics.CheckSphere(groundCheck.position, distanciaGroundCheck, capaSuelo);
-        animator.SetBool("IsGrounded", estaEnSuelo);
-    }
-
-    void Saltar()
-    {
-        // Aplicar fuerza de salto
-        rb.velocity = new Vector3(rb.velocity.x, fuerzaSalto, rb.velocity.z);
-
-        // Activar animación
-        animator.SetTrigger("Jump");
-
-        Debug.Log("¡Saltando!");
-    }
-
     void Disparar()
     {
-        // Raycast desde el centro de la cámara, IGNORANDO el layer del jugador
         Ray ray = camara.GetComponent<Camera>().ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
         RaycastHit hit;
         Vector3 targetPoint;
 
-        // ✨ IMPORTANTE: ~layersAIgnorar invierte la máscara (detecta todo EXCEPTO esos layers)
         if (Physics.Raycast(ray, out hit, 1000f, ~layersAIgnorar))
         {
             targetPoint = hit.point;
-            Debug.DrawLine(camara.position, hit.point, UnityEngine.Color.red, 0.5f);
         }
         else
         {
@@ -158,7 +219,6 @@ public class MovementThirdPerson : MonoBehaviour
 
         Vector3 direccionDisparo = (targetPoint - firePoint.position).normalized;
 
-        // Crear bala
         if (bulletPrefab != null && firePoint != null)
         {
             GameObject bullet = Instantiate(bulletPrefab, firePoint.position, Quaternion.LookRotation(direccionDisparo));
@@ -172,18 +232,26 @@ public class MovementThirdPerson : MonoBehaviour
             Destroy(bullet, 3f);
         }
 
-        // Efectos
         if (audioSource != null && shootSound != null)
         {
             audioSource.PlayOneShot(shootSound);
         }
 
-        animator.SetTrigger("Shoot");
+        // ✨ CAMBIO: Usar Bool en vez de Trigger
+        animator.SetBool("IsShooting", true);
+        StartCoroutine(DesactivarDisparo());
 
         if (crosshair != null)
         {
             crosshair.OnShoot();
         }
+    }
+
+    // ✨ NUEVA Coroutine para desactivar disparo
+    IEnumerator DesactivarDisparo()
+    {
+        yield return new WaitForSeconds(0.3f); // Duración del disparo
+        animator.SetBool("IsShooting", false);
     }
 
     void Mover()
@@ -274,20 +342,21 @@ public class MovementThirdPerson : MonoBehaviour
 
     void OnApplicationFocus(bool hasFocus)
     {
-        if (hasFocus)
+        if (hasFocus && (pauseManager == null || !pauseManager.IsPaused()))
         {
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
         }
     }
 
-    // Para visualizar el groundCheck en el editor
+    // Visualización del raycast en el editor (solo en Scene View)
     void OnDrawGizmosSelected()
     {
-        if (groundCheck != null)
-        {
-            Gizmos.color = UnityEngine.Color.red;
-            Gizmos.DrawWireSphere(groundCheck.position, distanciaGroundCheck);
-        }
+        Vector3 rayOrigin = transform.position + Vector3.up * offsetRaycast;
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawRay(rayOrigin, Vector3.down * distanciaRaycastSuelo);
+
+        Gizmos.color = Color.blue;
+        Gizmos.DrawWireSphere(rayOrigin, 0.05f);
     }
 }
